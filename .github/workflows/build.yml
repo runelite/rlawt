@@ -1,0 +1,117 @@
+on:
+  push:
+jobs:
+  windows:
+    runs-on: windows-2022
+    steps:
+    - uses: actions/checkout@v3
+    - name: install dependencies
+      shell: bash
+      run: |
+        set -e -x
+        curl -Lo jdk-11.0.15+10.zip 'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15%2B10/OpenJDK11U-jdk_x86-32_windows_hotspot_11.0.15_10.zip'
+        echo "c8aa33913b27bb09cc66342e567b3a1fe0f4b136569e57e713bd56ef540d4105  jdk-11.0.15+10.zip" | sha256sum -c
+        unzip jdk-11.0.15+10.zip
+    - name: build windows-x86
+      shell: bash
+      run: |
+        set -e -x
+        mkdir -p build/windows-x86
+        cd build/windows-x86
+        # cmake isn't smart enough to find jawt of the correct arch
+        cmake ../../ -A Win32 -DJAVA_JVM_LIBRARY=../../jdk-11.0.15+10/lib/jvm.lib -DJAVA_AWT_LIBRARY=../../jdk-11.0.15+10/lib/jawt.lib
+        cmake --build . --config Release
+    - uses: actions/upload-artifact@v3
+      with:
+        name: windows-x86
+        path: build/windows-x86/Release/rlawt.dll
+        retention-days: 1
+        if-no-files-found: error
+    - name: build windows-amd64
+      shell: bash
+      run: |
+        set -e -x
+        mkdir -p build/windows-amd64
+        cd build/windows-amd64
+        cmake ../../
+        cmake --build . --config Release
+    - uses: actions/upload-artifact@v3
+      with:
+        name: windows-amd64
+        path: build/windows-amd64/Release/rlawt.dll
+        retention-days: 1
+        if-no-files-found: error
+  macos:
+    runs-on: macos-11
+    steps:
+    - uses: actions/checkout@v3
+    - name: install dependencies
+      run: |
+        set -e -x
+        curl -Lo jdk-11.0.15+10.zip 'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15%2B10/OpenJDK11U-jdk_aarch64_mac_hotspot_11.0.15_10.tar.gz'
+        echo "e84143a6c633a26aeefcb1fd5ad8dfb9e952cfec2a1af5c9d9b69f2390990dac  jdk-11.0.15+10.zip" | shasum -a 256 -c
+        tar -xf jdk-11.0.15+10.zip
+    - name: build macos-x86_64
+      run: |
+        set -e -x
+        mkdir -p build/macos-x86_64
+        cd build/macos-x86_64
+        cmake ../../ -DCMAKE_OSX_ARCHITECTURES=x86_64
+        cmake --build . --config Release
+    - uses: actions/upload-artifact@v3
+      with:
+        name: macos-x86_64
+        path: build/macos-x86_64/librlawt.dylib
+        retention-days: 1
+        if-no-files-found: error
+    - name: build macos-aarch64
+      run: |
+        set -e -x
+        mkdir -p build/macos-aarch64
+        cd build/macos-aarch64
+        cmake ../../ -DCMAKE_OSX_ARCHITECTURES=arm64 -DJAVA_JVM_LIBRARY=../../jdk-11.0.15+10/Contents/Home/lib/server/libjvm.dylib -DJAVA_AWT_LIBRARY=../../jdk-11.0.15+10/Contents/Home/lib/libjawt.dylib
+        cmake --build . --config Release
+    - uses: actions/upload-artifact@v3
+      with:
+        name: macos-aarch64
+        path: build/macos-aarch64/librlawt.dylib
+        retention-days: 1
+        if-no-files-found: error
+  linux-amd64:
+    needs: [windows, macos]
+    runs-on: ubuntu-20.04
+    container:
+      image: amd64/centos:7.9.2009
+    steps:
+    - uses: actions/checkout@v3
+    - name: install dependencies
+      run: |
+        set -e -x
+        curl -Lo cmake-3.23.2-linux-x86_64.tar.gz 'https://github.com/Kitware/CMake/releases/download/v3.23.2/cmake-3.23.2-linux-x86_64.tar.gz'
+        echo "aaced6f745b86ce853661a595bdac6c5314a60f8181b6912a0a4920acfa32708  cmake-3.23.2-linux-x86_64.tar.gz" | sha256sum -c
+        tar -xf cmake-3.23.2-linux-x86_64.tar.gz
+        mv cmake-3.23.2-linux-x86_64 cmake
+        yum -y install libX11-devel mesa-libGL-devel java-11-openjdk-devel "@Development Tools"
+    - uses: actions/download-artifact@v3
+      with:
+        path: jar/net/runelite/rlawt/
+    - name: build linux-amd64
+      run: |
+        set -e -x
+        mkdir -p build/linux-amd64
+        cd build/linux-amd64
+        ../../cmake/bin/cmake ../../
+        ../../cmake/bin/cmake --build . --config Release
+        cd ../../
+        mkdir jar/net/runelite/rlawt/linux-amd64
+        cp build/linux-amd64/librlawt.so jar/net/runelite/rlawt/linux-amd64/
+        cp -r build/linux-amd64/CMakeFiles/jar.dir/net jar/
+    - name: jar
+      run: |
+        set -e -x
+        jar cvf rlawt.jar -C jar/ .
+    - uses: actions/upload-artifact@v3
+      with:
+        name: jar
+        path: rlawt.jar
+        if-no-files-found: error
