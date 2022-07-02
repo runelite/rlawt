@@ -63,10 +63,10 @@ void rlawtUnlockAWT(JNIEnv *env, AWTContext *ctx) {
 JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_create0(JNIEnv *env, jclass _self, jobject component) {
 	AWTContext *ctx = calloc(1, sizeof(AWTContext));
 
-	// java < 9 on Windows does not support jawt 1_7
 #ifdef  __APPLE__
-	ctx->awt.version = JAWT_VERSION_1_4 | JAWT_MACOSX_USE_CALAYER;
+	ctx->awt.version = JAWT_VERSION_1_7;
 #else
+	// java < 9 on Windows does not support jawt 1_7
 	ctx->awt.version = JAWT_VERSION_1_4;
 #endif
 	if (!JAWT_GetAWT(env, &ctx->awt)) {
