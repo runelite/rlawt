@@ -63,7 +63,12 @@ void rlawtUnlockAWT(JNIEnv *env, AWTContext *ctx) {
 JNIEXPORT jlong JNICALL Java_net_runelite_rlawt_AWTContext_create0(JNIEnv *env, jclass _self, jobject component) {
 	AWTContext *ctx = calloc(1, sizeof(AWTContext));
 
-	ctx->awt.version = JAWT_VERSION_1_7;
+	// java < 9 on Windows does not support jawt 1_7
+#ifdef  __APPLE__
+	ctx->awt.version = JAWT_VERSION_1_4 | JAWT_MACOSX_USE_CALAYER;
+#else
+	ctx->awt.version = JAWT_VERSION_1_4;
+#endif
 	if (!JAWT_GetAWT(env, &ctx->awt)) {
 		rlawtThrow(env, "cannot get the awt");
 		goto free_ctx;
