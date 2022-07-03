@@ -87,6 +87,7 @@ public final class AWTContext
 			}
 
 			Path temp = Files.createTempFile("", name);
+			temp.toFile().deleteOnExit();
 			Files.copy(is, temp, StandardCopyOption.REPLACE_EXISTING);
 			System.load(temp.toAbsolutePath().toString());
 			nativesLoaded = true;
