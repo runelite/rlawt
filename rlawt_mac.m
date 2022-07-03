@@ -39,6 +39,7 @@
 }
 - (void)setFrame:(CGRect)newValue;
 - (void)fixFrame;
+- (void)displayIOSurface:(id)ioSurface;
 @end
 
 @implementation RLLayer
@@ -63,6 +64,15 @@
 		self.superlayer.frame.size.height - offsetY - self.frame.size.height,
 		self.frame.size.width,
 		self.frame.size.height);
+}
+
+- (void)displayIOSurface:(id)ioSurface {
+	[CATransaction begin];
+	[CATransaction setDisableActions: true];
+	self.contents = ioSurface;
+	[(id<CanSetContentsChanged>)self setContentsChanged];
+	[self fixFrame];
+	[CATransaction commit];
 }
 @end
 
@@ -283,14 +293,11 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 	}
 
 	glFlush();
-	dispatch_sync(dispatch_get_main_queue(), ^{
-		[CATransaction begin];
-		[CATransaction setDisableActions: true];
-		ctx->layer.contents = (id) (ctx->buffer[ctx->back]);
-		[(id<CanSetContentsChanged>)ctx->layer setContentsChanged];
-		[(RLLayer*)ctx->layer fixFrame];
-		[CATransaction commit];
-	});
+	[(RLLayer*)ctx->layer performSelectorOnMainThread:
+		@selector(displayIOSurface:)
+		withObject: (id)(ctx->buffer[ctx->back])
+		waitUntilDone: true];
+	
 	ctx->back ^= 1;
 
 	if (!ctx->buffer[ctx->back]
