@@ -10,9 +10,16 @@ jobs:
       shell: bash
       run: |
         set -e -x
-        curl -Lo jdk-11.0.15+10.zip 'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15%2B10/OpenJDK11U-jdk_x86-32_windows_hotspot_11.0.15_10.zip'
-        echo "c8aa33913b27bb09cc66342e567b3a1fe0f4b136569e57e713bd56ef540d4105  jdk-11.0.15+10.zip" | sha256sum -c
-        unzip jdk-11.0.15+10.zip
+        mkdir -p jdks/x86
+        mkdir -p jdks/aarch64
+        curl -Lo jdks/x86/jdk.zip 'https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.15%2B10/OpenJDK11U-jdk_x86-32_windows_hotspot_11.0.15_10.zip'
+        echo "c8aa33913b27bb09cc66342e567b3a1fe0f4b136569e57e713bd56ef540d4105 jdks/x86/jdk.zip" | sha256sum -c
+        unzip jdks/x86/jdk.zip -d jdks/x86
+        mv jdks/x86/jdk-*/* jdks/x86/
+        curl -Lo jdks/aarch64/jdk.zip 'https://aka.ms/download-jdk/microsoft-jdk-11.0.19-windows-aarch64.zip'
+        echo "2f321bfe2cd2a4759b061f37c82d57d8944e0983bda84d6f9a4d790dd21ccb94 jdks/aarch64/jdk.zip" | sha256sum -c
+        unzip jdks/aarch64/jdk.zip -d jdks/aarch64
+        mv jdks/aarch64/jdk-*/* jdks/aarch64/
     - name: build windows-x86
       shell: bash
       run: |
@@ -20,7 +27,7 @@ jobs:
         mkdir -p build/windows-x86
         cd build/windows-x86
         # cmake isn't smart enough to find jawt of the correct arch
-        cmake ../../ -A Win32 -DJAVA_JVM_LIBRARY=../../jdk-11.0.15+10/lib/jvm.lib -DJAVA_AWT_LIBRARY=../../jdk-11.0.15+10/lib/jawt.lib
+        cmake ../../ -A Win32 -DJAVA_JVM_LIBRARY=../../jdks/x86/lib/jvm.lib -DJAVA_AWT_LIBRARY=../../jdks/x86/lib/jawt.lib
         cmake --build . --config Release
     - uses: actions/upload-artifact@v3
       with:
@@ -40,6 +47,20 @@ jobs:
       with:
         name: windows-amd64
         path: build/windows-amd64/Release/rlawt.dll
+        retention-days: 1
+        if-no-files-found: error
+    - name: build windows-aarch64
+      shell: bash
+      run: |
+        set -e -x
+        mkdir -p build/windows-aarch64
+        cd build/windows-aarch64
+        cmake ../../ -A ARM64 -DJAVA_JVM_LIBRARY=../../jdks/aarch64/lib/jvm.lib -DJAVA_AWT_LIBRARY=../../jdks/aarch64/lib/jawt.lib
+        cmake --build . --config Release
+    - uses: actions/upload-artifact@v3
+      with:
+        name: windows-aarch64
+        path: build/windows-aarch64/Release/rlawt.dll
         retention-days: 1
         if-no-files-found: error
   macos:
