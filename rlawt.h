@@ -63,7 +63,6 @@ typedef struct {
 	int offsetX;
 	int offsetY;
 
-	GLfloat backingScaleFactor;
 #endif
 
 #ifdef __unix__

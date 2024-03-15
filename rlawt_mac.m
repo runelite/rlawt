@@ -110,8 +110,8 @@ static void propsPutInt(CFMutableDictionaryRef props, const CFStringRef key, int
 static bool rlawtCreateIOSurface(JNIEnv *env, AWTContext *ctx) {
 	CFMutableDictionaryRef props = CFDictionaryCreateMutable(NULL, 4, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 	CGSize size = ctx->layer.frame.size;
-	propsPutInt(props, kIOSurfaceHeight, size.height*ctx->backingScaleFactor);
-	propsPutInt(props, kIOSurfaceWidth, size.width*ctx->backingScaleFactor);
+	propsPutInt(props, kIOSurfaceHeight, size.height*ctx->layer.superlayer.contentsScale);
+	propsPutInt(props, kIOSurfaceWidth, size.width*ctx->layer.superlayer.contentsScale);
 	propsPutInt(props, kIOSurfaceBytesPerElement, 4);
 	propsPutInt(props, kIOSurfacePixelFormat, (int)'BGRA');
 
@@ -128,7 +128,7 @@ static bool rlawtCreateIOSurface(JNIEnv *env, AWTContext *ctx) {
 	CGLError err = CGLTexImageIOSurface2D(
 		ctx->context,
 		target, GL_RGBA,
-		size.width*ctx->backingScaleFactor, size.height*ctx->backingScaleFactor,
+		size.width*ctx->layer.superlayer.contentsScale, size.height*ctx->layer.superlayer.contentsScale,
 		GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV,
 		buf, 
 		0);
@@ -211,15 +211,13 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_createGLContext(JNIEnv
 	glGenTextures(2, &ctx->tex[0]);
 	glGenFramebuffers(2, &ctx->fbo[0]);
 
-    ctx->backingScaleFactor = dspi.windowLayer.contentsScale;
-
 	dispatch_sync(dispatch_get_main_queue(), ^{
 		RLLayer *layer = [[RLLayer alloc] init];
 		layer.opaque = true;
 		layer.needsDisplayOnBoundsChange = false;
 		layer.magnificationFilter = kCAFilterNearest;
 		layer.contentsGravity = kCAGravityCenter;
-		layer.contentsScale = ctx->backingScaleFactor;
+		layer.contentsScale = dspi.windowLayer.contentsScale;
 		layer.affineTransform = CGAffineTransformMakeScale(1, -1);
 
 		ctx->layer = layer;
@@ -307,11 +305,10 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 	if (!ctx->buffer[ctx->back]
 		|| IOSurfaceGetWidth(ctx->buffer[ctx->back]) != ctx->layer.frame.size.width
 		|| IOSurfaceGetHeight(ctx->buffer[ctx->back]) != ctx->layer.frame.size.height
-		|| ctx->backingScaleFactor != ctx->layer.superlayer.contentsScale) {
-            ctx->backingScaleFactor = ctx->layer.superlayer.contentsScale;
+		|| ctx->layer.contentsScale != ctx->layer.superlayer.contentsScale) {
             dispatch_sync(dispatch_get_main_queue(), ^{
                 RLLayer *layer = (RLLayer*)ctx->layer;
-                layer.contentsScale = ctx->backingScaleFactor;
+                layer.contentsScale = ctx->layer.superlayer.contentsScale;
             });
             if (!rlawtCreateIOSurface(env, ctx)) {
                 return;
