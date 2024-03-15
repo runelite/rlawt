@@ -218,7 +218,7 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_createGLContext(JNIEnv
 		layer.opaque = true;
 		layer.needsDisplayOnBoundsChange = false;
 		layer.magnificationFilter = kCAFilterNearest;
-		layer.contentsGravity = kCAGravityTopLeft;
+		layer.contentsGravity = kCAGravityCenter;
 		layer.contentsScale = ctx->backingScaleFactor;
 		layer.affineTransform = CGAffineTransformMakeScale(1, -1);
 

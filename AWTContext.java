@@ -117,7 +117,7 @@ public final class AWTContext
 		{
 			if (c instanceof Window)
 			{
-				Insets insets = ((Window)c).getInsets();
+				Insets insets = ((Window) c).getInsets();
 				x -= insets.left;
 				y -= insets.top;
 				break;
@@ -178,5 +178,4 @@ public final class AWTContext
 	public native long getGLXDisplay();
 
 	public native long getWGLHDC();
-
 }
