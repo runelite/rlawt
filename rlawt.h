@@ -62,7 +62,6 @@ typedef struct {
 
 	int offsetX;
 	int offsetY;
-
 #endif
 
 #ifdef __unix__

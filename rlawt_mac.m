@@ -306,17 +306,17 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 		|| IOSurfaceGetWidth(ctx->buffer[ctx->back]) != ctx->layer.frame.size.width
 		|| IOSurfaceGetHeight(ctx->buffer[ctx->back]) != ctx->layer.frame.size.height
 		|| ctx->layer.contentsScale != ctx->layer.superlayer.contentsScale) {
-            dispatch_sync(dispatch_get_main_queue(), ^{
-                RLLayer *layer = (RLLayer*)ctx->layer;
-                layer.contentsScale = ctx->layer.superlayer.contentsScale;
-            });
-            if (!rlawtCreateIOSurface(env, ctx)) {
-                return;
-            }
-            ctx->back ^= 1; // remake both buffers at the same time to prevent flickering
-            if (!rlawtCreateIOSurface(env, ctx)) {
-                return;
-            }
+			dispatch_sync(dispatch_get_main_queue(), ^{
+				RLLayer *layer = (RLLayer*)ctx->layer;
+				layer.contentsScale = ctx->layer.superlayer.contentsScale;
+			});
+			if (!rlawtCreateIOSurface(env, ctx)) {
+				return;
+			}
+			ctx->back ^= 1; // remake both buffers at the same time to prevent flickering
+			if (!rlawtCreateIOSurface(env, ctx)) {
+				return;
+			}
 	}
 }
 
