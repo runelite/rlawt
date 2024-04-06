@@ -35,7 +35,8 @@
 @end
 
 @interface RLLayer : CALayer {
-	int offsetY;
+	@public int offsetY;
+	CGFloat newScale;
 }
 - (void)setFrame:(CGRect)newValue;
 - (void)fixFrame;
@@ -69,6 +70,7 @@
 - (void)displayIOSurface:(id)ioSurface {
 	[CATransaction begin];
 	[CATransaction setDisableActions: true];
+	self.contentsScale = self->newScale;
 	self.contents = ioSurface;
 	[(id<CanSetContentsChanged>)self setContentsChanged];
 	[self fixFrame];
@@ -108,8 +110,12 @@ static void propsPutInt(CFMutableDictionaryRef props, const CFStringRef key, int
 }
 
 static bool rlawtCreateIOSurface(JNIEnv *env, AWTContext *ctx) {
-	CFMutableDictionaryRef props = CFDictionaryCreateMutable(NULL, 4, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+	CGFloat scale = ctx->layer.superlayer.contentsScale;
 	CGSize size = ctx->layer.frame.size;
+	size.width *= scale;
+	size.height *= scale;
+
+	CFMutableDictionaryRef props = CFDictionaryCreateMutable(NULL, 4, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
 	propsPutInt(props, kIOSurfaceHeight, size.height);
 	propsPutInt(props, kIOSurfaceWidth, size.width);
 	propsPutInt(props, kIOSurfaceBytesPerElement, 4);
@@ -153,6 +159,7 @@ static bool rlawtCreateIOSurface(JNIEnv *env, AWTContext *ctx) {
 		CFRelease(ctx->buffer[ctx->back]);
 	}
 	ctx->buffer[ctx->back] = buf;
+	ctx->bufferScale[ctx->back] = scale;
 	return true;
 freeSurface:
 	CFRelease(buf);
@@ -293,7 +300,9 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 	}
 
 	glFlush();
-	[(RLLayer*)ctx->layer performSelectorOnMainThread:
+	RLLayer *rlLayer = (RLLayer*) ctx->layer;
+	rlLayer->newScale = ctx->bufferScale[ctx->back];
+	[rlLayer performSelectorOnMainThread:
 		@selector(displayIOSurface:)
 		withObject: (id)(ctx->buffer[ctx->back])
 		waitUntilDone: true];
@@ -301,8 +310,9 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 	ctx->back ^= 1;
 
 	if (!ctx->buffer[ctx->back]
-		|| IOSurfaceGetWidth(ctx->buffer[ctx->back]) != ctx->layer.frame.size.width 
-		|| IOSurfaceGetHeight(ctx->buffer[ctx->back]) != ctx->layer.frame.size.height) {
+		|| IOSurfaceGetWidth(ctx->buffer[ctx->back]) != (size_t) (ctx->layer.frame.size.width * ctx->bufferScale[ctx->back])
+		|| IOSurfaceGetHeight(ctx->buffer[ctx->back]) != (size_t) (ctx->layer.frame.size.height * ctx->bufferScale[ctx->back])
+		|| ctx->layer.superlayer.contentsScale != ctx->bufferScale[ctx->back]) {
 		if (!rlawtCreateIOSurface(env, ctx)) {
 			return;
 		}

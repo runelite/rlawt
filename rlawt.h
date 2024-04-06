@@ -54,6 +54,7 @@ typedef struct {
 #ifdef __APPLE__
 	CALayer *layer;
 	IOSurfaceRef buffer[2];
+	CGFloat bufferScale[2];
 	CGLContextObj context;
 
 	GLuint tex[2];
