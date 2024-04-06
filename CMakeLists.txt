@@ -15,15 +15,15 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET "10.9")
 set(CMAKE_JAVA_COMPILE_FLAGS "-source" "1.8" "-target" "1.8")
 add_jar(jar AWTContext.java GENERATE_NATIVE_HEADERS rlawt-headers)
 
-add_library(rlawt SHARED rlawt.c rlawt_nix.c rlawt_windows.c)
-
-target_link_libraries(rlawt rlawt-headers ${JNI_LIBRARIES})
-
 if (MSVC)
 	add_compile_options(/W4)
 else()
 	add_compile_options(-Wall)
 endif()
+
+add_library(rlawt SHARED rlawt.c rlawt_nix.c rlawt_windows.c)
+
+target_link_libraries(rlawt rlawt-headers ${JNI_LIBRARIES})
 
 if (WIN32)
 	include_directories(include/windows)
