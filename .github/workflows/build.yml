@@ -5,7 +5,7 @@ jobs:
   windows:
     runs-on: windows-2022
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       shell: bash
       run: |
@@ -24,12 +24,10 @@ jobs:
       shell: bash
       run: |
         set -e -x
-        mkdir -p build/windows-x86
-        cd build/windows-x86
         # cmake isn't smart enough to find jawt of the correct arch
-        cmake ../../ -A Win32 -DJAVA_JVM_LIBRARY=../../jdks/x86/lib/jvm.lib -DJAVA_AWT_LIBRARY=../../jdks/x86/lib/jawt.lib
-        cmake --build . --config Release
-    - uses: actions/upload-artifact@v3
+        cmake -B build/windows-x86 -A Win32 -DJAVA_JVM_LIBRARY=jdks/x86/lib/jvm.lib -DJAVA_AWT_LIBRARY=jdks/x86/lib/jawt.lib .
+        cmake --build build/windows-x86 --config Release
+    - uses: actions/upload-artifact@v4
       with:
         name: windows-x86
         path: build/windows-x86/Release/rlawt.dll
@@ -39,11 +37,9 @@ jobs:
       shell: bash
       run: |
         set -e -x
-        mkdir -p build/windows-amd64
-        cd build/windows-amd64
-        cmake ../../
-        cmake --build . --config Release
-    - uses: actions/upload-artifact@v3
+        cmake -B build/windows-amd64 .
+        cmake --build build/windows-amd64 --config Release
+    - uses: actions/upload-artifact@v4
       with:
         name: windows-amd64
         path: build/windows-amd64/Release/rlawt.dll
@@ -53,20 +49,18 @@ jobs:
       shell: bash
       run: |
         set -e -x
-        mkdir -p build/windows-aarch64
-        cd build/windows-aarch64
-        cmake ../../ -A ARM64 -DJAVA_JVM_LIBRARY=../../jdks/aarch64/lib/jvm.lib -DJAVA_AWT_LIBRARY=../../jdks/aarch64/lib/jawt.lib
-        cmake --build . --config Release
-    - uses: actions/upload-artifact@v3
+        cmake -B build/windows-aarch64 -A ARM64 -DJAVA_JVM_LIBRARY=jdks/aarch64/lib/jvm.lib -DJAVA_AWT_LIBRARY=jdks/aarch64/lib/jawt.lib .
+        cmake --build build/windows-aarch64 --config Release
+    - uses: actions/upload-artifact@v4
       with:
         name: windows-aarch64
         path: build/windows-aarch64/Release/rlawt.dll
         retention-days: 1
         if-no-files-found: error
   macos:
-    runs-on: macos-11
+    runs-on: macos-13
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         set -e -x
@@ -76,11 +70,9 @@ jobs:
     - name: build macos-x86_64
       run: |
         set -e -x
-        mkdir -p build/macos-x86_64
-        cd build/macos-x86_64
-        cmake ../../ -DCMAKE_OSX_ARCHITECTURES=x86_64
-        cmake --build . --config Release
-    - uses: actions/upload-artifact@v3
+        cmake -B build/macos-x86_64 -DCMAKE_OSX_ARCHITECTURES=x86_64 .
+        cmake --build build/macos-x86_64 --config Release
+    - uses: actions/upload-artifact@v4
       with:
         name: macos-x86_64
         path: build/macos-x86_64/librlawt.dylib
@@ -89,11 +81,9 @@ jobs:
     - name: build macos-aarch64
       run: |
         set -e -x
-        mkdir -p build/macos-aarch64
-        cd build/macos-aarch64
-        cmake ../../ -DCMAKE_OSX_ARCHITECTURES=arm64 -DJAVA_JVM_LIBRARY=../../jdk-11.0.15+10/Contents/Home/lib/server/libjvm.dylib -DJAVA_AWT_LIBRARY=../../jdk-11.0.15+10/Contents/Home/lib/libjawt.dylib
-        cmake --build . --config Release
-    - uses: actions/upload-artifact@v3
+        cmake -B build/macos-aarch64 -DCMAKE_OSX_ARCHITECTURES=arm64 -DJAVA_JVM_LIBRARY=jdk-11.0.15+10/Contents/Home/lib/server/libjvm.dylib -DJAVA_AWT_LIBRARY=jdk-11.0.15+10/Contents/Home/lib/libjawt.dylib .
+        cmake --build build/macos-aarch64 --config Release
+    - uses: actions/upload-artifact@v4
       with:
         name: macos-aarch64
         path: build/macos-aarch64/librlawt.dylib
@@ -101,30 +91,24 @@ jobs:
         if-no-files-found: error
   linux-amd64:
     needs: [windows, macos]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     container:
-      image: amd64/centos:7.9.2009
+      image: amd64/ubuntu:20.04
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: install dependencies
       run: |
         set -e -x
-        curl -Lo cmake-3.23.2-linux-x86_64.tar.gz 'https://github.com/Kitware/CMake/releases/download/v3.23.2/cmake-3.23.2-linux-x86_64.tar.gz'
-        echo "aaced6f745b86ce853661a595bdac6c5314a60f8181b6912a0a4920acfa32708  cmake-3.23.2-linux-x86_64.tar.gz" | sha256sum -c
-        tar -xf cmake-3.23.2-linux-x86_64.tar.gz
-        mv cmake-3.23.2-linux-x86_64 cmake
-        yum -y install libX11-devel mesa-libGL-devel java-11-openjdk-devel "@Development Tools"
-    - uses: actions/download-artifact@v3
+        apt update
+        apt install -y cmake openjdk-11-jdk libgl-dev
+    - uses: actions/download-artifact@v4
       with:
         path: jar/net/runelite/rlawt/
     - name: build linux-amd64
       run: |
         set -e -x
-        mkdir -p build/linux-amd64
-        cd build/linux-amd64
-        ../../cmake/bin/cmake ../../
-        ../../cmake/bin/cmake --build . --config Release
-        cd ../../
+        cmake -B build/linux-amd64 .
+        cmake --build build/linux-amd64 --config Release
         mkdir jar/net/runelite/rlawt/linux-amd64
         cp build/linux-amd64/librlawt.so jar/net/runelite/rlawt/linux-amd64/
         cp -r build/linux-amd64/CMakeFiles/jar.dir/net jar/
@@ -132,7 +116,7 @@ jobs:
       run: |
         set -e -x
         jar cvf rlawt.jar -C jar/ .
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: jar
         path: rlawt.jar
