@@ -89,8 +89,63 @@ jobs:
         path: build/macos-aarch64/librlawt.dylib
         retention-days: 1
         if-no-files-found: error
+  linux-aarch64:
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:20.04
+    env:
+      DEBIAN_FRONTEND: "noninteractive"
+      JAVA_HOME_AARCH64: "/usr/lib/jvm/java-1.11.0-openjdk-arm64"
+    steps:
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        set -e -x
+
+        # Ensure the default sources that are defined in /etc/apt/sources.list do not attempt
+        # to be used for arm64/aarch64 packages.
+        sed -i 's/^\(deb\s\)/\1[arch=amd64] /' /etc/apt/sources.list
+
+        # Allow us to install arm64 packages for cross compilation
+        mkdir -p /etc/apt/sources.list.d
+        cat <<'EOF' > /etc/apt/sources.list.d/aarch64.list
+        deb [arch=arm64] http://ports.ubuntu.com/ focal main multiverse universe
+        deb [arch=arm64] http://ports.ubuntu.com/ focal-security main multiverse universe
+        deb [arch=arm64] http://ports.ubuntu.com/ focal-backports main multiverse universe
+        deb [arch=arm64] http://ports.ubuntu.com/ focal-updates main multiverse universe
+        EOF
+        dpkg --add-architecture arm64
+
+        # The default CMake find Java will
+        apt update
+        apt install -y \
+            cmake \
+            openjdk-11-jdk \
+            openjdk-11-jdk:arm64 \
+            libgl-dev:arm64 \
+            g++-aarch64-linux-gnu
+    - name: build linux-aarch64
+      run: |
+        set -e -x
+
+        cmake -B build/linux-aarch64 \
+          -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-linux-aarch64.cmake \
+          -DJAVA_AWT_LIBRARY=$JAVA_HOME_AARCH64/lib/libjawt.so \
+          -DJAVA_JVM_LIBRARY=$JAVA_HOME_AARCH64/lib/server/libjvm.so \
+          -DJAVA_INCLUDE_PATH=$JAVA_HOME_AARCH64/include \
+          -DJAVA_INCLUDE_PATH2=$JAVA_HOME_AARCH64/include/linux \
+          -DJAVA_AWT_INCLUDE_PATH=$JAVA_HOME_AARCH64/include \
+          .
+
+        cmake --build build/linux-aarch64 --config Release
+    - uses: actions/upload-artifact@v4
+      with:
+        name: linux-aarch64
+        path: build/linux-aarch64/librlawt.so
+        retention-days: 1
+        if-no-files-found: error
   linux-amd64:
-    needs: [windows, macos]
+    needs: [windows, macos, linux-aarch64]
     runs-on: ubuntu-24.04
     container:
       image: amd64/ubuntu:20.04
