@@ -116,7 +116,8 @@ jobs:
         EOF
         dpkg --add-architecture arm64
 
-        # The default CMake find Java will
+        # We install the x86_64 version of openjdk here because CMake's FindJNDI module
+        # will use it to figure out which version of java is installed
         apt update
         apt install -y \
             cmake \
