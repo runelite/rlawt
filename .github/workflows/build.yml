@@ -58,7 +58,7 @@ jobs:
         retention-days: 1
         if-no-files-found: error
   macos:
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
     - uses: actions/checkout@v4
     - name: install dependencies
