@@ -27,8 +27,11 @@
 
 #include "rlawt.h"
 #include <jawt_md.h>
+#include <AppKit/AppKit.h>
 #include <OpenGL/gl3.h>
 #include <QuartzCore/QuartzCore.h>
+
+static NSString *JavaRunLoopMode = @"AWTRunLoopMode";
 
 @protocol CanSetContentsChanged
 -(void)setContentsChanged;
@@ -401,7 +404,13 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 	[rlLayer performSelectorOnMainThread:
 		@selector(displayIOSurface:)
 		withObject: (id)(pool->entries[pool->front].surface)
-		waitUntilDone: true];
+		waitUntilDone: true
+		modes: [NSArray arrayWithObjects:
+			NSDefaultRunLoopMode,
+			NSModalPanelRunLoopMode,
+			NSEventTrackingRunLoopMode,
+			JavaRunLoopMode,
+			nil]];
 
 	POOL_STAT(pool, swaps);
 
