@@ -54,6 +54,7 @@ typedef struct {
 	CGFloat scale;
 	GLuint tex;
 	GLuint fbo;
+	bool queued;
 } IOSurfaceEntry;
 
 typedef struct {

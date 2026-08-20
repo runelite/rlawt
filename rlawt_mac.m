@@ -208,10 +208,11 @@ freeSurface:
 }
 
 static int poolNextBack(IOSurfacePool *pool) {
-	// Find any non-front surface the compositor isn't using
+	// Find any non-front surface the compositor isn't using and which is not queued
+	// for asynchronous presentation on the AppKit main thread.
 	for (int i = 0; i < pool->count; i++) {
 		if (i == pool->front) continue;
-		if (pool->entries[i].surface && !IOSurfaceIsInUse(pool->entries[i].surface)) {
+		if (pool->entries[i].surface && !pool->entries[i].queued && !IOSurfaceIsInUse(pool->entries[i].surface)) {
 			POOL_STAT(pool, reuses);
 			return i;
 		}
@@ -229,15 +230,38 @@ static int poolNextBack(IOSurfacePool *pool) {
 		return idx;
 	}
 
-	// Pool full, all in use -- evict first non-front entry.
-	// count >= 2 is guaranteed here (pool grows on first swap), so this always finds one.
+	// Pool full, all in use -- evict first non-front entry that is not queued
+	// for async presentation.
 	for (int i = 0; i < pool->count; i++) {
-		if (i != pool->front) {
+		if (i != pool->front && !pool->entries[i].queued) {
 			POOL_STAT(pool, stalls);
 			return i;
 		}
 	}
-	return 0; // unreachable
+
+	POOL_STAT(pool, stalls);
+	return -1;
+}
+
+static bool poolCanPresentWithoutBlocking(IOSurfacePool *pool, int nextFront) {
+	for (int i = 0; i < pool->count; i++) {
+		if (i == nextFront) continue;
+		if (pool->entries[i].surface && !pool->entries[i].queued && !IOSurfaceIsInUse(pool->entries[i].surface)) {
+			return true;
+		}
+	}
+
+	if (pool->count < RLAWT_MAX_POOL) {
+		return true;
+	}
+
+	for (int i = 0; i < pool->count; i++) {
+		if (i != nextFront && !pool->entries[i].queued) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 #ifdef RLAWT_POOL_DEBUG
@@ -394,19 +418,45 @@ JNIEXPORT void JNICALL Java_net_runelite_rlawt_AWTContext_swapBuffers(JNIEnv *en
 
 	IOSurfacePool *pool = &ctx->pool;
 
+#ifdef RLAWT_ASYNC_PRESENT
+	if (!poolCanPresentWithoutBlocking(pool, pool->back)) {
+		POOL_STAT(pool, stalls);
+		return;
+	}
+#endif
+
 	// Present the current back buffer
 	pool->front = pool->back;
 	RLLayer *rlLayer = (RLLayer*) ctx->layer;
 	rlLayer->newScale = pool->entries[pool->front].scale;
+	IOSurfaceEntry *frontEntry = &pool->entries[pool->front];
+	IOSurfaceRef frontSurface = frontEntry->surface;
+
+#ifdef RLAWT_ASYNC_PRESENT
+	frontEntry->queued = true;
+	CFRetain(frontSurface);
+	[rlLayer retain];
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[rlLayer displayIOSurface:(id)frontSurface];
+		frontEntry->queued = false;
+		CFRelease(frontSurface);
+		[rlLayer release];
+	});
+#else
 	[rlLayer performSelectorOnMainThread:
 		@selector(displayIOSurface:)
-		withObject: (id)(pool->entries[pool->front].surface)
+		withObject: (id)frontSurface
 		waitUntilDone: true];
+#endif
 
 	POOL_STAT(pool, swaps);
 
 	// Find a free surface for the next frame
-	pool->back = poolNextBack(pool);
+	int nextBack = poolNextBack(pool);
+	if (nextBack < 0) {
+		return;
+	}
+	pool->back = nextBack;
 	IOSurfaceEntry *back = &pool->entries[pool->back];
 
 	// Create/recreate surface if needed (new slot, wrong size, or still held by compositor)
